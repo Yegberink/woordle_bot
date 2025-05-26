@@ -24,7 +24,7 @@ def calculate_entropy(possible_words):
             letter_positions[i][letter] = letter_positions[i].get(letter, 0) + 1
 
     entropy_scores = {}
-    for word in all_words:
+    for word in possible_words:
         score = 0
         seen = set()
         for i, letter in enumerate(word):
