@@ -3,27 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <title>Woordle Assistent 🇳🇱</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
+        :root {
+            --green: #6aaa64;
+            --yellow: #c9b458;
+            --gray: #787c7e;
+        }
+
         body {
-            font-family: sans-serif;
+            font-family: system-ui, sans-serif;
+            margin: 0;
+            padding: 1.5em;
+            background-color: #f9f9f9;
+            color: #222;
             max-width: 600px;
-            margin: auto;
-            padding: 2em;
+            margin-left: auto;
+            margin-right: auto;
         }
-        input {
-            padding: 0.5em;
-            margin: 0.5em 0;
+
+        h1, h2, h3 {
+            text-align: center;
+        }
+
+        form {
+            background: white;
+            padding: 1.5em;
+            border-radius: 0.75em;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+
+        label {
+            display: block;
+            margin-top: 1em;
+            font-weight: bold;
+        }
+
+        input[type="text"] {
+            padding: 0.6em;
             width: 100%;
+            font-size: 1.1em;
+            border: 1px solid #ccc;
+            border-radius: 0.5em;
         }
-        button {
-            padding: 0.5em 1em;
-            margin: 0.5em 0.25em;
+
+        #feedback-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.25em;
+            margin-top: 0.5em;
         }
+
         #feedback-buttons button {
-            font-size: 1.2em;
-            width: 40px;
-            height: 40px;
+            font-size: 1.4em;
+            flex: 1;
+            padding: 0.6em 0;
+            border: none;
+            border-radius: 0.5em;
+            background: #e0e0e0;
+            transition: background 0.2s;
+        }
+
+        #feedback-buttons button:hover {
+            background: #d5d5d5;
+        }
+
+        button[type="submit"],
+        button[type="button"] {
+            width: 48%;
+            font-size: 1em;
+            padding: 0.8em;
+            margin-top: 1em;
+            border: none;
+            border-radius: 0.5em;
+            background-color: #6aaa64;
+            color: white;
             cursor: pointer;
+        }
+
+        button[type="button"] {
+            background-color: #ccc;
+            color: #333;
+        }
+
+        #suggestion {
+            font-size: 1.4em;
+            text-align: center;
+            font-weight: bold;
+            margin-top: 1em;
+        }
+
+        ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        li {
+            padding: 0.3em 0;
+        }
+
+        #remaining-words {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #fff;
+            padding: 1em;
+            border-radius: 0.5em;
+            border: 1px solid #eee;
+        }
+
+        @media (max-width: 500px) {
+            #feedback-buttons button {
+                font-size: 1.2em;
+                padding: 0.4em 0;
+            }
+
+            button[type="submit"],
+            button[type="button"] {
+                width: 100%;
+                margin-bottom: 0.5em;
+            }
+
+            form {
+                padding: 1em;
+            }
         }
     </style>
 </head>
@@ -37,13 +139,14 @@
         <div id="feedback-buttons"></div>
         <input type="text" id="feedback" name="feedback" maxlength="5" style="display: none;">
 
-        <button type="submit">Volgende Suggestie</button>
-        <button type="button" onclick="resetGame()">Reset</button>
+        <div style="display: flex; justify-content: space-between; gap: 1%;">
+            <button type="submit">Volgende Suggestie</button>
+            <button type="button" onclick="resetGame()">Reset</button>
+        </div>
     </form>
 
     <h2>Suggestie:</h2>
     <p id="suggestion">...</p>
-    <p id="second-suggestion" style="color: #666;"></p>
 
     <h3>Overgebleven woorden (<span id="remaining-count">?</span>):</h3>
     <ul id="remaining-words"></ul>
@@ -56,7 +159,6 @@
         const guessInput = document.getElementById("guess");
         const feedbackInput = document.getElementById("feedback");
         const suggestionEl = document.getElementById("suggestion");
-        const secondSuggestionEl = document.getElementById("second-suggestion");
         const remainingCountEl = document.getElementById("remaining-count");
         const remainingList = document.getElementById("remaining-words");
         const historyList = document.getElementById("guess-history");
@@ -70,7 +172,6 @@
                 const button = document.createElement("button");
                 button.textContent = "⬛";
                 button.dataset.state = "B";
-                button.style.margin = "0 2px";
 
                 button.onclick = (e) => {
                     e.preventDefault();
@@ -95,8 +196,9 @@
             const response = await fetch("/next", { method: "POST", body: formData });
             const data = await response.json();
 
-            suggestionEl.textContent = `1e keuze: ${data.guess}`;
-            secondSuggestionEl.textContent = data.second_best ? `2e keuze: ${data.second_best}` : "";
+            suggestionEl.textContent = data.second_best
+                ? `${data.guess} (of ${data.second_best})`
+                : data.guess;
             guessInput.value = data.guess;
             remainingCountEl.textContent = data.count;
 
@@ -120,7 +222,6 @@
         async function resetGame() {
             await fetch("/reset", { method: "POST" });
             suggestionEl.textContent = "...";
-            secondSuggestionEl.textContent = "";
             remainingList.innerHTML = "";
             remainingCountEl.textContent = "?";
             historyList.innerHTML = "";
@@ -134,8 +235,9 @@
             const response = await fetch("/next", { method: "POST" });
             const data = await response.json();
 
-            suggestionEl.textContent = `1e keuze: ${data.guess}`;
-            secondSuggestionEl.textContent = data.second_best ? `2e keuze: ${data.second_best}` : "";
+            suggestionEl.textContent = data.second_best
+                ? `${data.guess} (of ${data.second_best})`
+                : data.guess;
             guessInput.value = data.guess;
             remainingCountEl.textContent = data.count;
 
