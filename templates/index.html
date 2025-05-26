@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <title>Woordle Assistent 🇳🇱</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 600px;
+            margin: auto;
+            padding: 2em;
+        }
+        input {
+            padding: 0.5em;
+            margin: 0.5em 0;
+            width: 100%;
+        }
+        button {
+            padding: 0.5em 1em;
+            margin: 0.5em 0.25em;
+        }
+        #feedback-buttons button {
+            font-size: 1.2em;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Woordle Assistent 🇳🇱</h1>
+    <form id="wordle-form">
+        <label for="guess">Jouw gok:</label>
+        <input type="text" id="guess" name="guess" maxlength="5" readonly>
+
+        <label for="feedback">Feedback:</label>
+        <div id="feedback-buttons"></div>
+        <input type="text" id="feedback" name="feedback" maxlength="5" style="display: none;">
+
+        <button type="submit">Volgende Suggestie</button>
+        <button type="button" onclick="resetGame()">Reset</button>
+    </form>
+
+    <h2>Suggestie:</h2>
+    <p id="suggestion">...</p>
+    <p id="second-suggestion" style="color: #666;"></p>
+
+    <h3>Overgebleven woorden (<span id="remaining-count">?</span>):</h3>
+    <ul id="remaining-words"></ul>
+
+    <h3>Geschiedenis:</h3>
+    <ul id="guess-history"></ul>
+
+    <script>
+        const form = document.getElementById("wordle-form");
+        const guessInput = document.getElementById("guess");
+        const feedbackInput = document.getElementById("feedback");
+        const suggestionEl = document.getElementById("suggestion");
+        const secondSuggestionEl = document.getElementById("second-suggestion");
+        const remainingCountEl = document.getElementById("remaining-count");
+        const remainingList = document.getElementById("remaining-words");
+        const historyList = document.getElementById("guess-history");
+        const feedbackButtonsContainer = document.getElementById("feedback-buttons");
+
+        function createFeedbackButtons(guess) {
+            feedbackButtonsContainer.innerHTML = "";
+            const feedback = Array(5).fill("B");
+
+            guess.split("").forEach((char, idx) => {
+                const button = document.createElement("button");
+                button.textContent = "⬛";
+                button.dataset.state = "B";
+                button.style.margin = "0 2px";
+
+                button.onclick = (e) => {
+                    e.preventDefault();
+                    const current = button.dataset.state;
+                    const next = current === "B" ? "Y" : current === "Y" ? "G" : "B";
+                    button.dataset.state = next;
+                    button.textContent = next === "B" ? "⬛" : next === "Y" ? "🟨" : "🟩";
+                    feedback[idx] = next;
+                    feedbackInput.value = feedback.join("");
+                };
+
+                feedbackButtonsContainer.appendChild(button);
+            });
+
+            feedbackInput.value = feedback.join("");
+        }
+
+        form.onsubmit = async function (e) {
+            e.preventDefault();
+
+            const formData = new FormData(form);
+            const response = await fetch("/next", { method: "POST", body: formData });
+            const data = await response.json();
+
+            suggestionEl.textContent = `1e keuze: ${data.guess}`;
+            secondSuggestionEl.textContent = data.second_best ? `2e keuze: ${data.second_best}` : "";
+            guessInput.value = data.guess;
+            remainingCountEl.textContent = data.count;
+
+            remainingList.innerHTML = "";
+            data.remaining.forEach(word => {
+                const li = document.createElement("li");
+                li.textContent = word;
+                remainingList.appendChild(li);
+            });
+
+            historyList.innerHTML = "";
+            data.history.forEach(item => {
+                const li = document.createElement("li");
+                li.innerHTML = `<b>${item.guess}</b> → ${item.feedback}`;
+                historyList.appendChild(li);
+            });
+
+            createFeedbackButtons(data.guess);
+        };
+
+        async function resetGame() {
+            await fetch("/reset", { method: "POST" });
+            suggestionEl.textContent = "...";
+            secondSuggestionEl.textContent = "";
+            remainingList.innerHTML = "";
+            remainingCountEl.textContent = "?";
+            historyList.innerHTML = "";
+            guessInput.value = "";
+            feedbackInput.value = "";
+            feedbackButtonsContainer.innerHTML = "";
+            await loadInitialSuggestion();
+        }
+
+        async function loadInitialSuggestion() {
+            const response = await fetch("/next", { method: "POST" });
+            const data = await response.json();
+
+            suggestionEl.textContent = `1e keuze: ${data.guess}`;
+            secondSuggestionEl.textContent = data.second_best ? `2e keuze: ${data.second_best}` : "";
+            guessInput.value = data.guess;
+            remainingCountEl.textContent = data.count;
+
+            remainingList.innerHTML = "";
+            data.remaining.forEach(word => {
+                const li = document.createElement("li");
+                li.textContent = word;
+                remainingList.appendChild(li);
+            });
+
+            createFeedbackButtons(data.guess);
+        }
+
+        window.onload = loadInitialSuggestion;
+    </script>
+</body>
+</html>
