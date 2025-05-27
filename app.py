@@ -134,7 +134,7 @@ def next_guess():
         history.append({"guess": guess, "feedback": feedback})
         session["history"] = history
 
-    if len(remaining) <= 5 & len(remaining) > 1:
+    if 1 < len(remaining) <= 5:
         scores = find_occurence(remaining)
         top_two = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:2]
         next_word = top_two[0][0]
