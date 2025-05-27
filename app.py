@@ -139,7 +139,7 @@ def next_guess():
         top_two = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:2]
         next_word = top_two[0][0]
         second_best = top_two[1][0] if len(top_two) > 1 else None
-    if len(remaining) == 1:
+    elif len(remaining) == 1:
         next_word = remaining[0]
         second_best = None
     else:
