@@ -205,9 +205,9 @@
             const response = await fetch("/next", { method: "POST", body: formData });
             const data = await response.json();
 
-            suggestionEl.textContent = data.second_best
-                ? `${data.guess} (of ${data.second_best})`
-                : data.guess;
+            suggestionEl.textContent = data.guess
+                ? (data.second_best ? `${data.guess} (of ${data.second_best})` : data.guess)
+                : "Geen suggesties meer gevonden.";
             guessInput.value = data.guess;
             remainingCountEl.textContent = data.count;
 
