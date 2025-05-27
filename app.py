@@ -4,6 +4,7 @@ import csv
 import math
 from collections import Counter
 import os
+import json
 
 app = Flask(__name__)
 
@@ -16,6 +17,10 @@ Session(app)
 # Load word list
 with open("filtered_dutch_words.txt", "r", encoding="utf-8") as f:
     all_words = [line.strip().lower() for line in f if len(line.strip()) == 5]
+
+# Load word frequencies for late game guessing
+with open("word_frequencies.json", encoding="utf-8") as f:
+    word_freqs = json.load(f)
 
 def calculate_entropy(possible_words):
     letter_positions = [{} for _ in range(5)]
@@ -36,6 +41,15 @@ def calculate_entropy(possible_words):
                 seen.add(letter)
         entropy_scores[word] = score
     return entropy_scores
+
+def find_occurence(possible_words):
+    frequency_scores = {}
+    for word in possible_words:
+        score = word_freqs.get(word.lower(), 0)
+        frequency_scores[word] = score
+
+    return frequency_scores
+        
 
 def filter_words(guess, feedback, words):
     filtered = []
@@ -120,6 +134,11 @@ def next_guess():
         history.append({"guess": guess, "feedback": feedback})
         session["history"] = history
 
+    if len(remaining) <= 5 & len(remaining) > 1:
+        scores = find_occurence(remaining)
+        top_two = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:2]
+        next_word = top_two[0][0]
+        second_best = top_two[1][0] if len(top_two) > 1 else None
     if len(remaining) == 1:
         next_word = remaining[0]
         second_best = None
