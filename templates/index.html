@@ -1,266 +1,109 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Woordle Assistent 🇳🇱</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wordle Helper</title>
     <style>
-        :root {
-            --green: #6aaa64;
-            --yellow: #c9b458;
-            --gray: #787c7e;
+        .guess-history {
+            margin-top: 20px;
         }
-
-        body {
-            font-family: system-ui, sans-serif;
-            margin: 0;
-            padding: 1.5em;
-            background-color: #f9f9f9;
-            color: #222;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        h1, h2, h3 {
+        .letter-box {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
             text-align: center;
-        }
-
-        form {
-            background: white;
-            padding: 1.5em;
-            border-radius: 0.75em;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-        }
-
-        label {
-            display: block;
-            margin-top: 1em;
+            margin: 2px;
+            font-size: 24px;
             font-weight: bold;
-        }
-
-        input[type="text"] {
-            padding: 0.6em;
-            width: 100%;
-            font-size: 1.1em;
-            border: 1px solid #ccc;
-            border-radius: 0.5em;
-        }
-
-        #feedback-buttons {
-            display: flex;
-            justify-content: space-between;
-            gap: 0.25em;
-            margin-top: 0.5em;
-        }
-
-        #feedback-buttons button {
-            font-size: 1.4em;
-            flex: 1;
-            padding: 0.6em 0;
-            border: none;
-            border-radius: 0.5em;
-            background: #e0e0e0;
-            transition: background 0.2s;
-        }
-
-        #feedback-buttons button:hover {
-            background: #d5d5d5;
-        }
-
-        button[type="submit"],
-        button[type="button"] {
-            width: 48%;
-            font-size: 1em;
-            padding: 0.8em;
-            margin-top: 1em;
-            border: none;
-            border-radius: 0.5em;
-            background-color: #6aaa64;
             color: white;
-            cursor: pointer;
+            border-radius: 5px;
         }
-
-        button[type="button"] {
-            background-color: #ccc;
-            color: #333;
-        }
-
-        #suggestion {
-            font-size: 1.4em;
-            text-align: center;
-            font-weight: bold;
-            margin-top: 1em;
-        }
-
-        ul {
-            list-style: none;
-            padding-left: 0;
-        }
-
-        li {
-            padding: 0.3em 0;
-        }
-
-        #remaining-words {
-            max-height: 200px;
-            overflow-y: auto;
-            background: #fff;
-            padding: 1em;
-            border-radius: 0.5em;
-            border: 1px solid #eee;
-        }
-
-        @media (max-width: 500px) {
-            #feedback-buttons button {
-                font-size: 1.2em;
-                padding: 0.4em 0;
-            }
-
-            button[type="submit"],
-            button[type="button"] {
-                width: 100%;
-                margin-bottom: 0.5em;
-            }
-
-            form {
-                padding: 1em;
-            }
-        }
+        .green { background-color: #6aaa64; }
+        .yellow { background-color: #c9b458; }
+        .gray { background-color: #787c7e; }
     </style>
 </head>
 <body>
-    <h1>Woordle Assistent 🇳🇱</h1>
-    <form id="wordle-form">
-        <label for="guess">Jouw gok:</label>
-        <input type="text" id="guess" name="guess" maxlength="5">
+    <h1>Wordle Helper</h1>
 
-        <label for="feedback">Feedback:</label>
-        <div id="feedback-buttons"></div>
-        <input type="text" id="feedback" name="feedback" maxlength="5" style="display: none;">
-
-        <div style="display: flex; justify-content: space-between; gap: 1%;">
-            <button type="submit">Volgende Suggestie</button>
-            <button type="button" onclick="resetGame()">Reset</button>
-        </div>
+    <form id="guess-form">
+        <label for="guess">Guess:</label>
+        <input type="text" id="guess" name="guess" maxlength="5" required>
+        <label for="feedback">Feedback (GYB):</label>
+        <input type="text" id="feedback" name="feedback" maxlength="5" required>
+        <button type="submit">Submit</button>
+        <button type="button" id="reset">Reset</button>
     </form>
-    <div style="margin-top: 1em; font-size: 0.95em; background: #fff4e5; padding: 1em; border-radius: 0.5em; border: 1px solid #ffe1b3;">
-        <strong>Hoe geef je feedback?</strong><br>
-        Klik op de vakjes om de juiste kleur aan te geven voor elke letter van je vorige gok:
-        <ul style="margin-top: 0.5em; padding-left: 1.2em;">
-            <li>⬛ = Letter komt <strong>niet</strong> voor in het woord (grijs)</li>
-            <li>🟨 = Letter komt <strong>wel</strong> voor, maar op de verkeerde plek (geel)</li>
-            <li>🟩 = Letter zit op de <strong>juiste</strong> plek (groen)</li>
-        </ul>
-        Tip: Klik meerdere keren om door de kleuren te schakelen.
+
+    <h2>Next Suggestion</h2>
+    <div id="suggestion"></div>
+
+    <h2>Remaining Words: <span id="remaining-count"></span></h2>
+    <ul id="remaining-list"></ul>
+
+    <div class="guess-history" id="guess-history">
+        <h2>History</h2>
     </div>
-    <h2>Suggestie:</h2>
-    <p id="suggestion">...</p>
-
-    <h3>Overgebleven woorden (<span id="remaining-count">?</span>):</h3>
-    <ul id="remaining-words"></ul>
-
-    <h3>Geschiedenis:</h3>
-    <ul id="guess-history"></ul>
 
     <script>
-        const form = document.getElementById("wordle-form");
-        const guessInput = document.getElementById("guess");
-        const feedbackInput = document.getElementById("feedback");
-        const suggestionEl = document.getElementById("suggestion");
-        const remainingCountEl = document.getElementById("remaining-count");
-        const remainingList = document.getElementById("remaining-words");
-        const historyList = document.getElementById("guess-history");
-        const feedbackButtonsContainer = document.getElementById("feedback-buttons");
+        document.getElementById("guess-form").addEventListener("submit", async function(event) {
+            event.preventDefault();
+            const guess = document.getElementById("guess").value;
+            const feedback = document.getElementById("feedback").value;
 
-        function createFeedbackButtons(guess) {
-            feedbackButtonsContainer.innerHTML = "";
-            const feedback = Array(5).fill("B");
+            const formData = new FormData();
+            formData.append("guess", guess);
+            formData.append("feedback", feedback);
 
-            guess.split("").forEach((char, idx) => {
-                const button = document.createElement("button");
-                button.textContent = "⬛";
-                button.dataset.state = "B";
-
-                button.onclick = (e) => {
-                    e.preventDefault();
-                    const current = button.dataset.state;
-                    const next = current === "B" ? "Y" : current === "Y" ? "G" : "B";
-                    button.dataset.state = next;
-                    button.textContent = next === "B" ? "⬛" : next === "Y" ? "🟨" : "🟩";
-                    feedback[idx] = next;
-                    feedbackInput.value = feedback.join("");
-                };
-
-                feedbackButtonsContainer.appendChild(button);
+            const response = await fetch("/next", {
+                method: "POST",
+                body: formData
             });
 
-            feedbackInput.value = feedback.join("");
-        }
-
-        form.onsubmit = async function (e) {
-            e.preventDefault();
-
-            const formData = new FormData(form);
-            const response = await fetch("/next", { method: "POST", body: formData });
             const data = await response.json();
+            updateUI(data);
+        });
 
-            suggestionEl.textContent = data.guess
-                ? (data.second_best ? `${data.guess} (of ${data.second_best})` : data.guess)
-                : "Geen suggesties meer gevonden.";
-            guessInput.value = data.guess;
-            remainingCountEl.textContent = data.count;
-
-            remainingList.innerHTML = "";
-            data.remaining.forEach(word => {
-                const li = document.createElement("li");
-                li.textContent = word;
-                remainingList.appendChild(li);
-            });
-
-            historyList.innerHTML = "";
-            data.history.forEach(item => {
-                const li = document.createElement("li");
-                li.innerHTML = `<b>${item.guess}</b> → ${item.feedback}`;
-                historyList.appendChild(li);
-            });
-
-            createFeedbackButtons(data.guess);
-        };
-
-        async function resetGame() {
+        document.getElementById("reset").addEventListener("click", async function() {
             await fetch("/reset", { method: "POST" });
-            suggestionEl.textContent = "...";
-            remainingList.innerHTML = "";
-            remainingCountEl.textContent = "?";
-            historyList.innerHTML = "";
-            guessInput.value = "";
-            feedbackInput.value = "";
-            feedbackButtonsContainer.innerHTML = "";
-            await loadInitialSuggestion();
-        }
+            document.getElementById("suggestion").innerText = "";
+            document.getElementById("remaining-list").innerHTML = "";
+            document.getElementById("guess-history").innerHTML = "<h2>History</h2>";
+            document.getElementById("remaining-count").innerText = "";
+        });
 
-        async function loadInitialSuggestion() {
-            const response = await fetch("/next", { method: "POST" });
-            const data = await response.json();
+        function updateUI(data) {
+            const suggestionDiv = document.getElementById("suggestion");
+            suggestionDiv.innerText = data.guess ? `Best guess: ${data.guess}` : "No suggestions.";
 
-            suggestionEl.textContent = data.second_best
-                ? `${data.guess} (of ${data.second_best})`
-                : data.guess;
-            guessInput.value = data.guess;
-            remainingCountEl.textContent = data.count;
-
-            remainingList.innerHTML = "";
+            const list = document.getElementById("remaining-list");
+            list.innerHTML = "";
             data.remaining.forEach(word => {
                 const li = document.createElement("li");
                 li.textContent = word;
-                remainingList.appendChild(li);
+                list.appendChild(li);
             });
 
-            createFeedbackButtons(data.guess);
-        }
+            document.getElementById("remaining-count").innerText = data.count;
 
-        window.onload = loadInitialSuggestion;
+            const historyDiv = document.getElementById("guess-history");
+            historyDiv.innerHTML = "<h2>History</h2>";
+            data.history.forEach(entry => {
+                const row = document.createElement("div");
+                for (let i = 0; i < 5; i++) {
+                    const box = document.createElement("div");
+                    box.className = "letter-box";
+                    const fb = entry.feedback[i];
+                    if (fb === "G") box.classList.add("green");
+                    else if (fb === "Y") box.classList.add("yellow");
+                    else box.classList.add("gray");
+
+                    box.textContent = entry.guess[i].toUpperCase();
+                    row.appendChild(box);
+                }
+                historyDiv.appendChild(row);
+            });
+        }
     </script>
 </body>
 </html>
