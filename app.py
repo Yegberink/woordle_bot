@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, session
 from flask_session import Session
 import csv
 import math
-from collections import Counter
+from collections import Counter, defaultdict
 import os
 import json
 
@@ -18,44 +18,54 @@ Session(app)
 with open("filtered_dutch_words.txt", "r", encoding="utf-8") as f:
     all_words = [line.strip().lower() for line in f if len(line.strip()) == 5]
 
-# Load word frequencies for late game guessing
+# Load word frequencies
 with open("word_frequencies.json", encoding="utf-8") as f:
     word_freqs = json.load(f)
 
-def calculate_entropy(possible_words):
-    letter_positions = [{} for _ in range(5)]
-    for word in possible_words:
-        for i, letter in enumerate(word):
-            letter_positions[i][letter] = letter_positions[i].get(letter, 0) + 1
+def simulate_feedback(guess, target):
+    result = ["B"] * 5
+    target_letters = list(target)
 
+    # First pass: correct letters in correct position
+    for i in range(5):
+        if guess[i] == target[i]:
+            result[i] = "G"
+            target_letters[i] = None  # mark used
+
+    # Second pass: correct letters in wrong position
+    for i in range(5):
+        if result[i] == "B" and guess[i] in target_letters:
+            result[i] = "Y"
+            target_letters[target_letters.index(guess[i])] = None  # mark used
+
+    return "".join(result)
+
+def calculate_entropy_full(possible_words, all_guesses):
     entropy_scores = {}
-    for word in possible_words:
-        score = 0
-        seen = set()
-        for i, letter in enumerate(word):
-            if letter not in seen:
-                freq = letter_positions[i].get(letter, 0)
-                prob = freq / len(possible_words)
-                if prob > 0:
-                    score += -prob * math.log2(prob)
-                seen.add(letter)
-        entropy_scores[word] = score
+
+    for guess in all_guesses:
+        pattern_counts = defaultdict(int)
+
+        for target in possible_words:
+            pattern = simulate_feedback(guess, target)
+            pattern_counts[pattern] += 1
+
+        total = len(possible_words)
+        entropy = 0
+        for count in pattern_counts.values():
+            p = count / total
+            entropy -= p * math.log2(p)
+        entropy_scores[guess] = entropy
+
     return entropy_scores
 
 def find_occurence(possible_words):
-    frequency_scores = {}
-    for word in possible_words:
-        score = word_freqs.get(word.lower(), 0)
-        frequency_scores[word] = score
-
-    return frequency_scores
-        
+    return {word: word_freqs.get(word.lower(), 0) for word in possible_words}
 
 def filter_words(guess, feedback, words):
     filtered = []
-    
-    # Count minimal number of occurrences required for each letter (green + yellow)
     min_counts = {}
+
     for g, f in zip(guess, feedback):
         if f in ("G", "Y"):
             min_counts[g] = min_counts.get(g, 0) + 1
@@ -63,27 +73,19 @@ def filter_words(guess, feedback, words):
     for word in words:
         match = True
 
-        # Check green and black/yellow positional constraints
         for i in range(5):
             g = guess[i]
             f = feedback[i]
 
             if f == "G":
-                # Must match the letter exactly here
                 if word[i] != g:
                     match = False
                     break
             elif f == "Y":
-                # Letter must be elsewhere, not here
                 if g not in word or word[i] == g:
                     match = False
                     break
             elif f == "B":
-                # Black: letter count in word should be <= min_count (i.e. exclude extra occurrences)
-                # And the letter should NOT be at this position
-                # But if the letter is required elsewhere (green/yellow), it can exist up to min_count
-                # So we check the total count of g in word
-                # If g is not in min_counts, min_counts.get(g,0) will be 0
                 if word[i] == g:
                     match = False
                     break
@@ -91,14 +93,12 @@ def filter_words(guess, feedback, words):
         if not match:
             continue
 
-        # Check letter counts vs min_counts
         word_counts = Counter(word)
         for letter, count in min_counts.items():
             if word_counts.get(letter, 0) < count:
                 match = False
                 break
 
-        # Also, letters marked black in guess but with min_count == 0 should NOT appear in the word
         for i in range(5):
             g = guess[i]
             f = feedback[i]
@@ -111,17 +111,15 @@ def filter_words(guess, feedback, words):
 
     return filtered
 
-
 @app.route("/")
 def index():
     return render_template("index.html")
 
 @app.route("/next", methods=["POST"])
 def next_guess():
-    guess = request.form.get("guess")
-    feedback = request.form.get("feedback")
+    guess = request.form.get("guess", "").lower()
+    feedback = request.form.get("feedback", "").upper()
 
-    # Initialize session state if not present
     if "remaining" not in session:
         session["remaining"] = all_words.copy()
         session["history"] = []
@@ -129,23 +127,25 @@ def next_guess():
     remaining = session["remaining"]
     history = session["history"]
 
-    if guess and feedback:
+    if guess and feedback and len(guess) == 5 and len(feedback) == 5:
         remaining = filter_words(guess, feedback, remaining)
         history.append({"guess": guess, "feedback": feedback})
         session["history"] = history
+
     if len(remaining) == 0:
         next_word = None
+        second_best = None
+    elif len(remaining) == 1:
+        next_word = remaining[0]
         second_best = None
     elif 1 < len(remaining) <= 5:
         scores = find_occurence(remaining)
         top_two = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:2]
         next_word = top_two[0][0]
         second_best = top_two[1][0] if len(top_two) > 1 else None
-    elif len(remaining) == 1:
-        next_word = remaining[0]
-        second_best = None
     else:
-        scores = calculate_entropy(remaining)
+        # Main improvement: consider *all* words for entropy calculation
+        scores = calculate_entropy_full(remaining, all_words)
         top_two = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:2]
         next_word = top_two[0][0]
         second_best = top_two[1][0] if len(top_two) > 1 else None
@@ -167,5 +167,5 @@ def reset():
     return "", 204
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Use Render's PORT or default to 5000 locally
-    app.run(host="0.0.0.0", port=port, debug=True)  # Bind to 0.0.0.0 for Render
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
