@@ -93,7 +93,16 @@
             margin-top: 1em;
         }
 
-        ul#remaining-words {
+        ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        li {
+            padding: 0.3em 0;
+        }
+
+        #remaining-words {
             max-height: 200px;
             overflow-y: auto;
             background: #fff;
@@ -101,31 +110,6 @@
             border-radius: 0.5em;
             border: 1px solid #eee;
         }
-
-        .guess-history {
-            margin-top: 1em;
-            background: #fff;
-            padding: 1em;
-            border-radius: 0.5em;
-            border: 1px solid #eee;
-        }
-
-        .letter-box {
-            display: inline-block;
-            width: 2em;
-            height: 2em;
-            line-height: 2em;
-            text-align: center;
-            margin: 0.1em;
-            font-size: 1.2em;
-            font-weight: bold;
-            color: white;
-            border-radius: 0.3em;
-        }
-
-        .green { background-color: var(--green); }
-        .yellow { background-color: var(--yellow); }
-        .gray { background-color: var(--gray); }
 
         @media (max-width: 500px) {
             #feedback-buttons button {
@@ -177,7 +161,7 @@
     <ul id="remaining-words"></ul>
 
     <h3>Geschiedenis:</h3>
-    <div id="guess-history" class="guess-history"></div>
+    <ul id="guess-history"></ul>
 
     <script>
         const form = document.getElementById("wordle-form");
@@ -186,7 +170,7 @@
         const suggestionEl = document.getElementById("suggestion");
         const remainingCountEl = document.getElementById("remaining-count");
         const remainingList = document.getElementById("remaining-words");
-        const historyContainer = document.getElementById("guess-history");
+        const historyList = document.getElementById("guess-history");
         const feedbackButtonsContainer = document.getElementById("feedback-buttons");
 
         function createFeedbackButtons(guess) {
@@ -234,21 +218,11 @@
                 remainingList.appendChild(li);
             });
 
-            // Render history with colored boxes
-            historyContainer.innerHTML = "";
+            historyList.innerHTML = "";
             data.history.forEach(item => {
-                const row = document.createElement("div");
-                item.guess.split("").forEach((char, i) => {
-                    const box = document.createElement("span");
-                    box.classList.add("letter-box");
-                    const fb = item.feedback[i];
-                    if (fb === "G") box.classList.add("green");
-                    else if (fb === "Y") box.classList.add("yellow");
-                    else box.classList.add("gray");
-                    box.textContent = char.toUpperCase();
-                    row.appendChild(box);
-                });
-                historyContainer.appendChild(row);
+                const li = document.createElement("li");
+                li.innerHTML = `<b>${item.guess}</b> → ${item.feedback}`;
+                historyList.appendChild(li);
             });
 
             createFeedbackButtons(data.guess);
@@ -259,7 +233,7 @@
             suggestionEl.textContent = "...";
             remainingList.innerHTML = "";
             remainingCountEl.textContent = "?";
-            historyContainer.innerHTML = "";
+            historyList.innerHTML = "";
             guessInput.value = "";
             feedbackInput.value = "";
             feedbackButtonsContainer.innerHTML = "";
