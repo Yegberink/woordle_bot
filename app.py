@@ -1,10 +1,9 @@
 from flask import Flask, render_template, request, jsonify, session
 from flask_session import Session
-import csv
+import json
 import math
 from collections import Counter, defaultdict
 import os
-import json
 
 app = Flask(__name__)
 
@@ -14,43 +13,45 @@ app.config['SESSION_FILE_DIR'] = './.flask_session/'
 app.config['SESSION_PERMANENT'] = False
 Session(app)
 
-# Load word list
+# Load word list once at startup
 with open("filtered_dutch_words.txt", "r", encoding="utf-8") as f:
-    all_words = [line.strip().lower() for line in f if len(line.strip()) == 5]
+    all_words = [w.strip().lower() for w in f if len(w.strip()) == 5]
 
-# Load word frequencies
-with open("word_frequencies.json", encoding="utf-8") as f:
+# Load word frequencies once
+with open("word_frequencies.json", "r", encoding="utf-8") as f:
     word_freqs = json.load(f)
+
+# Simulate Wordle-style feedback
 
 def simulate_feedback(guess, target):
     result = ["B"] * 5
     target_letters = list(target)
 
-    # First pass: correct letters in correct position
+    # First pass: correct position
     for i in range(5):
         if guess[i] == target[i]:
             result[i] = "G"
-            target_letters[i] = None  # mark used
+            target_letters[i] = None
 
-    # Second pass: correct letters in wrong position
+    # Second pass: wrong position but present
     for i in range(5):
         if result[i] == "B" and guess[i] in target_letters:
             result[i] = "Y"
-            target_letters[target_letters.index(guess[i])] = None  # mark used
+            target_letters[target_letters.index(guess[i])] = None
 
-    return "".join(result)
+    return ''.join(result)
+
+# Calculate entropy for each guess over possible targets
 
 def calculate_entropy_full(possible_words, all_guesses):
     entropy_scores = {}
+    total = len(possible_words)
 
     for guess in all_guesses:
         pattern_counts = defaultdict(int)
-
         for target in possible_words:
             pattern = simulate_feedback(guess, target)
             pattern_counts[pattern] += 1
-
-        total = len(possible_words)
         entropy = 0
         for count in pattern_counts.values():
             p = count / total
@@ -59,56 +60,45 @@ def calculate_entropy_full(possible_words, all_guesses):
 
     return entropy_scores
 
-def find_occurence(possible_words):
-    return {word: word_freqs.get(word.lower(), 0) for word in possible_words}
+# Filter remaining words by latest guess + feedback
 
 def filter_words(guess, feedback, words):
     filtered = []
     min_counts = {}
-
     for g, f in zip(guess, feedback):
         if f in ("G", "Y"):
             min_counts[g] = min_counts.get(g, 0) + 1
 
-    for word in words:
-        match = True
-
-        for i in range(5):
-            g = guess[i]
-            f = feedback[i]
-
-            if f == "G":
-                if word[i] != g:
-                    match = False
-                    break
-            elif f == "Y":
-                if g not in word or word[i] == g:
-                    match = False
-                    break
-            elif f == "B":
-                if word[i] == g:
-                    match = False
-                    break
-
-        if not match:
+    for w in words:
+        ok = True
+        # position checks
+        for i, (g, f) in enumerate(zip(guess, feedback)):
+            if f == "G" and w[i] != g:
+                ok = False
+                break
+            if f == "Y" and (g not in w or w[i] == g):
+                ok = False
+                break
+            if f == "B" and w[i] == g:
+                ok = False
+                break
+        if not ok:
             continue
-
-        word_counts = Counter(word)
-        for letter, count in min_counts.items():
-            if word_counts.get(letter, 0) < count:
-                match = False
+        # letter count checks
+        ctr = Counter(w)
+        for letter, cnt in min_counts.items():
+            if ctr.get(letter, 0) < cnt:
+                ok = False
                 break
-
-        for i in range(5):
-            g = guess[i]
-            f = feedback[i]
-            if f == "B" and min_counts.get(g, 0) == 0 and g in word:
-                match = False
+        if not ok:
+            continue
+        # handle extra blacks
+        for i, (g, f) in enumerate(zip(guess, feedback)):
+            if f == "B" and min_counts.get(g, 0) == 0 and g in ctr:
+                ok = False
                 break
-
-        if match:
-            filtered.append(word)
-
+        if ok:
+            filtered.append(w)
     return filtered
 
 @app.route("/")
@@ -120,6 +110,7 @@ def next_guess():
     guess = request.form.get("guess", "").lower()
     feedback = request.form.get("feedback", "").upper()
 
+    # Initialize session data
     if "remaining" not in session:
         session["remaining"] = all_words.copy()
         session["history"] = []
@@ -127,28 +118,27 @@ def next_guess():
     remaining = session["remaining"]
     history = session["history"]
 
+    # Apply last guess feedback
     if guess and feedback and len(guess) == 5 and len(feedback) == 5:
         remaining = filter_words(guess, feedback, remaining)
         history.append({"guess": guess, "feedback": feedback})
         session["history"] = history
 
-    if len(remaining) == 0:
+    # Determine next guess: entropy for >5, frequency for <=5
+    if not remaining:
         next_word = None
         second_best = None
     elif len(remaining) == 1:
         next_word = remaining[0]
         second_best = None
-    elif 1 < len(remaining) <= 5:
-        scores = find_occurence(remaining)
-        top_two = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:2]
-        next_word = top_two[0][0]
-        second_best = top_two[1][0] if len(top_two) > 1 else None
+    elif len(remaining) <= 5:
+        scored = sorted(remaining, key=lambda w: word_freqs.get(w, 0), reverse=True)
+        next_word = scored[0]
+        second_best = scored[1] if len(scored) > 1 else None
     else:
-        # Main improvement: consider *all* words for entropy calculation
-        scores = calculate_entropy_full(remaining, all_words)
-        top_two = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:2]
-        next_word = top_two[0][0]
-        second_best = top_two[1][0] if len(top_two) > 1 else None
+        entropy_scores = calculate_entropy_full(remaining, all_words)
+        top_two = sorted(entropy_scores.items(), key=lambda x: x[1], reverse=True)[:2]
+        next_word, second_best = top_two[0][0], top_two[1][0]
 
     session["remaining"] = remaining
 
@@ -164,7 +154,7 @@ def next_guess():
 def reset():
     session["remaining"] = all_words.copy()
     session["history"] = []
-    return "", 204
+    return ('', 204)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
