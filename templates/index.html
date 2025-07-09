@@ -249,149 +249,173 @@
             <ul id="guess-history"></ul>
         </div>
     </div>
+        <script>
+            const form = document.getElementById("wordle-form");
+            const guessInput = document.getElementById("guess");
+            const feedbackInput = document.getElementById("feedback");
+            const suggestionEl = document.getElementById("suggestion");
+            const remainingCountEl = document.getElementById("remaining-count");
+            const remainingList = document.getElementById("remaining-words");
+            const historyList = document.getElementById("guess-history");
+            const feedbackButtonsContainer = document.getElementById("feedback-buttons");
+            const loadingSpinner = document.getElementById("loading-spinner");
 
-    <script>
-        const form = document.getElementById("wordle-form");
-        const guessInput = document.getElementById("guess");
-        const feedbackInput = document.getElementById("feedback");
-        const suggestionEl = document.getElementById("suggestion");
-        const remainingCountEl = document.getElementById("remaining-count");
-        const remainingList = document.getElementById("remaining-words");
-        const historyList = document.getElementById("guess-history");
-        const feedbackButtonsContainer = document.getElementById("feedback-buttons");
-        const loadingSpinner = document.getElementById("loading-spinner");
+            function createFeedbackButtons(guess) {
+                feedbackButtonsContainer.innerHTML = "";
+                const feedback = Array(5).fill("B");
 
-        function createFeedbackButtons(guess) {
-            feedbackButtonsContainer.innerHTML = "";
-            const feedback = Array(5).fill("B");
+                guess.split("").forEach((char, idx) => {
+                    const button = document.createElement("button");
+                    button.textContent = "⬛";
+                    button.dataset.state = "B";
 
-            guess.split("").forEach((char, idx) => {
-                const button = document.createElement("button");
-                button.textContent = "⬛";
-                button.dataset.state = "B";
+                    button.onclick = (e) => {
+                        e.preventDefault();
+                        const current = button.dataset.state;
+                        const next = current === "B" ? "Y" : current === "Y" ? "G" : "B";
+                        button.dataset.state = next;
+                        button.textContent = next === "B" ? "⬛" : next === "Y" ? "🟨" : "🟩";
+                        updateFeedbackInputFromButtons();
+                    };
 
-                button.onclick = (e) => {
-                    e.preventDefault();
-                    const current = button.dataset.state;
-                    const next = current === "B" ? "Y" : current === "Y" ? "G" : "B";
-                    button.dataset.state = next;
-                    button.textContent = next === "B" ? "⬛" : next === "Y" ? "🟨" : "🟩";
-                    feedback[idx] = next;
-                    feedbackInput.value = feedback.join("");
-                };
-
-                feedbackButtonsContainer.appendChild(button);
-            });
-
-            feedbackInput.value = feedback.join("");
-        }
-
-        function updateHistory(history) {
-            historyList.innerHTML = "";
-            history.forEach(item => {
-                const li = document.createElement("li");
-                let colored = "";
-
-                for (let i = 0; i < 5; i++) {
-                    const letter = item.guess[i];
-                    const feedback = item.feedback[i];
-                    let color = "#787c7e"; // Gray
-
-                    if (feedback === "G") color = "#6aaa64";
-                    else if (feedback === "Y") color = "#c9b458";
-
-                    colored += `<span style="background-color:${color}; color: white; padding: 0.3em 0.5em; margin: 0 0.1em; border-radius: 0.3em; display:inline-block; min-width:1.2em; text-align:center;">${letter.toUpperCase()}</span>`;
-                }
-
-                li.innerHTML = colored;
-                historyList.appendChild(li);
-            });
-        }
-
-        form.onsubmit = async function (e) {
-            e.preventDefault();
-
-            loadingSpinner.style.display = "flex";
-            guessInput.disabled = true;
-
-            try {
-                const formData = new FormData(form);
-                const response = await fetch("/next", { method: "POST", body: formData });
-                const data = await response.json();
-
-                if (data.guess) {
-                    suggestionEl.textContent = data.second_best
-                        ? `${data.guess} (of ${data.second_best})`
-                        : data.guess;
-                    guessInput.value = data.guess;
-                    createFeedbackButtons(data.guess);
-                } else {
-                    suggestionEl.textContent = "Geen suggesties meer gevonden.";
-                    guessInput.value = "";
-                    feedbackButtonsContainer.innerHTML = "";
-                }
-
-                remainingCountEl.textContent = data.count;
-                remainingList.innerHTML = "";
-                data.remaining.forEach(word => {
-                    const li = document.createElement("li");
-                    li.textContent = word;
-                    remainingList.appendChild(li);
+                    feedbackButtonsContainer.appendChild(button);
                 });
 
-                updateHistory(data.history);
-            } catch (err) {
-                suggestionEl.textContent = "Er ging iets mis.";
-                console.error(err);
-            } finally {
-                loadingSpinner.style.display = "none";
-                guessInput.disabled = false;
-            }
-        };
-
-        async function resetGame() {
-            await fetch("/reset", { method: "POST" });
-            suggestionEl.textContent = "...";
-            remainingList.innerHTML = "";
-            remainingCountEl.textContent = "?";
-            historyList.innerHTML = "";
-            guessInput.value = "";
-            feedbackInput.value = "";
-            feedbackButtonsContainer.innerHTML = "";
-            await loadInitialSuggestion();
-        }
-
-        async function loadInitialSuggestion() {
-            loadingSpinner.style.display = "flex";
-            guessInput.disabled = true;
-
-            const response = await fetch("/next", { method: "POST" });
-            const data = await response.json();
-
-            if (data.guess) {
-                suggestionEl.textContent = data.second_best
-                    ? `${data.guess} (of ${data.second_best})`
-                    : data.guess;
-                guessInput.value = data.guess;
-                createFeedbackButtons(data.guess);
-            } else {
-                suggestionEl.textContent = "Geen suggesties meer gevonden.";
+                updateFeedbackInputFromButtons(); // initieel "BBBBB"
             }
 
-            remainingCountEl.textContent = data.count;
-            remainingList.innerHTML = "";
-            data.remaining.forEach(word => {
-                const li = document.createElement("li");
-                li.textContent = word;
-                remainingList.appendChild(li);
-            });
+            function updateFeedbackInputFromButtons() {
+                const buttons = document.querySelectorAll('#feedback-buttons button');
+                const feedback = Array.from(buttons).map(btn => btn.dataset.state || 'B');
+                feedbackInput.value = feedback.join('');
+            }
 
-            updateHistory(data.history);
-            loadingSpinner.style.display = "none";
-            guessInput.disabled = false;
-        }
+            function updateHistory(history) {
+                historyList.innerHTML = "";
+                history.forEach(item => {
+                    const li = document.createElement("li");
+                    let colored = "";
 
-        window.onload = loadInitialSuggestion;
-    </script>
+                    for (let i = 0; i < 5; i++) {
+                        const letter = item.guess[i];
+                        const feedback = item.feedback[i];
+                        let color = "#787c7e"; // Gray
+
+                        if (feedback === "G") color = "#6aaa64";
+                        else if (feedback === "Y") color = "#c9b458";
+
+                        colored += `<span style="background-color:${color}; color: white; padding: 0.3em 0.5em; margin: 0 0.1em; border-radius: 0.3em; display:inline-block; min-width:1.2em; text-align:center;">${letter.toUpperCase()}</span>`;
+                    }
+
+                    li.innerHTML = colored;
+                    historyList.appendChild(li);
+                });
+            }
+
+            form.onsubmit = async function (e) {
+                e.preventDefault();
+
+                // Herbereken feedbackstring
+                updateFeedbackInputFromButtons();
+
+                // Validatie vóór verzenden
+                if (!guessInput.value || guessInput.value.length !== 5 || feedbackInput.value.length !== 5) {
+                    alert("Vul een geldige gok én feedback in voordat je doorgaat.");
+                    return;
+                }
+
+                loadingSpinner.style.display = "flex";
+
+                const formData = new FormData(form);  // FormData pakken vóór disabled
+                guessInput.disabled = true;
+
+                try {
+                    const response = await fetch("/next", { method: "POST", body: formData });
+                    const data = await response.json();
+
+                    if (data.guess) {
+                        suggestionEl.textContent = data.second_best
+                            ? `${data.guess} (of ${data.second_best})`
+                            : data.guess;
+
+                        // Automatisch invullen als suggestie, maar bewerkbaar
+                        guessInput.value = data.guess;
+                        guessInput.disabled = false;
+
+                        createFeedbackButtons(data.guess);
+                    } else {
+                        suggestionEl.textContent = "Geen suggesties meer gevonden.";
+                        guessInput.value = "";
+                        feedbackButtonsContainer.innerHTML = "";
+                    }
+
+                    remainingCountEl.textContent = data.count;
+                    remainingList.innerHTML = "";
+                    data.remaining.forEach(word => {
+                        const li = document.createElement("li");
+                        li.textContent = word;
+                        remainingList.appendChild(li);
+                    });
+
+                    updateHistory(data.history);
+                } catch (err) {
+                    suggestionEl.textContent = "Er ging iets mis bij het ophalen van een suggestie.";
+                    console.error(err);
+                } finally {
+                    loadingSpinner.style.display = "none";
+                    guessInput.disabled = false;
+                }
+            };
+
+            async function resetGame() {
+                await fetch("/reset", { method: "POST" });
+                suggestionEl.textContent = "...";
+                remainingList.innerHTML = "";
+                remainingCountEl.textContent = "?";
+                historyList.innerHTML = "";
+                guessInput.value = "";
+                feedbackInput.value = "";
+                feedbackButtonsContainer.innerHTML = "";
+                await loadInitialSuggestion();
+            }
+
+            async function loadInitialSuggestion() {
+                loadingSpinner.style.display = "flex";
+                try {
+                    const response = await fetch("/next", { method: "POST" });
+                    const data = await response.json();
+
+                    if (data.guess) {
+                        suggestionEl.textContent = data.second_best
+                            ? `${data.guess} (of ${data.second_best})`
+                            : data.guess;
+
+                        guessInput.value = data.guess;
+                        createFeedbackButtons(data.guess);
+                    } else {
+                        suggestionEl.textContent = "Geen suggesties meer gevonden.";
+                    }
+
+                    remainingCountEl.textContent = data.count;
+                    remainingList.innerHTML = "";
+                    data.remaining.forEach(word => {
+                        const li = document.createElement("li");
+                        li.textContent = word;
+                        remainingList.appendChild(li);
+                    });
+
+                    updateHistory(data.history);
+                } catch (err) {
+                    suggestionEl.textContent = "Fout bij het laden van initiële suggestie.";
+                    console.error(err);
+                } finally {
+                    loadingSpinner.style.display = "none";
+                }
+            }
+
+            window.onload = loadInitialSuggestion;
+        </script>
+
+
 </body>
 </html>

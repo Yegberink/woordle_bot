@@ -8,6 +8,7 @@ from collections import Counter
 
 app = Flask(__name__)
 
+
 # Configure Flask-Session
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_FILE_DIR'] = './.flask_session/'
@@ -33,6 +34,8 @@ word_to_index = {w: i for i, w in enumerate(words_list)}
 def filter_words(guess, feedback, words):
     filtered = []
     min_counts = {}
+
+    # Tel minimaal verwachte keren voor G/Y
     for g, f in zip(guess, feedback):
         if f in ("G", "Y"):
             min_counts[g] = min_counts.get(g, 0) + 1
@@ -40,22 +43,28 @@ def filter_words(guess, feedback, words):
     for w in words:
         ok = True
         ctr = Counter(w)
+
         for i, (g, f) in enumerate(zip(guess, feedback)):
             if (f == "G" and w[i] != g) or \
                (f == "Y" and (g not in w or w[i] == g)) or \
                (f == "B" and w[i] == g):
                 ok = False
                 break
+
         if not ok or any(ctr[l] < c for l, c in min_counts.items()):
             continue
-        # extra black handling
+
+        # Extra black handling: volledig uitsluiten van letters
         for g, f in zip(guess, feedback):
-            if f == "B" and min_counts.get(g, 0) == 0 and g in ctr:
+            if f == "B" and min_counts.get(g, 0) == 0 and g in w:
                 ok = False
                 break
+
         if ok:
             filtered.append(w)
+
     return filtered
+
 
 # Compute entropy using precomputed lookup
 
@@ -85,9 +94,8 @@ def index():
 
 @app.route("/next", methods=["POST"])
 def next_guess():
-    guess = request.form.get("guess", "").lower()
-    feedback = request.form.get("feedback", "").upper()
-
+    guess = request.form.get("guess", "").strip().lower()
+    feedback = request.form.get("feedback", "").strip().upper()
     if "remaining" not in session:
         session["remaining"] = all_words.copy()
         session["history"] = []
@@ -111,11 +119,12 @@ def next_guess():
         second_best = scored[1] if len(scored) > 1 else None
     else:
         scores = calculate_entropy(remaining, all_words)
+
         top_two = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:2]
         next_word, second_best = top_two[0][0], top_two[1][0]
 
     session["remaining"] = remaining
-
+    
     return jsonify({
         "guess": next_word,
         "second_best": second_best,
@@ -129,3 +138,7 @@ def reset():
     session["remaining"] = all_words.copy()
     session["history"] = []
     return ('', 204)
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5002))
+    app.run(host="0.0.0.0", port=port, debug=True)

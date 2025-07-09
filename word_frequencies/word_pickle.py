@@ -25,6 +25,7 @@ word_to_index = {w: i for i, w in enumerate(words)}
 # Build optimized lookup
 feedback_lookup = {}
 for guess in words:
+    print(guess)
     patterns = defaultdict(list)
     for idx, target in enumerate(words):
         pattern = simulate_feedback(guess, target)
