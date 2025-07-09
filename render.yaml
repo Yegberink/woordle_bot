@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: wordle-helper
+    env: python
+    buildCommand: ""
+    startCommand: gunicorn app:app --workers=1 --threads=2 --preload --timeout=60
+    envVars:
+      - key: FLASK_ENV
+        value: production

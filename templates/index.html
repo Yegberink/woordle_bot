@@ -17,9 +17,26 @@
             padding: 1.5em;
             background-color: #f9f9f9;
             color: #222;
-            max-width: 600px;
+            max-width: 1200px;
             margin-left: auto;
             margin-right: auto;
+        }
+
+        .layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1em;
+            margin-top: 1em;
+        }
+
+        .column {
+            background: white;
+            padding: 1em;
+            border-radius: 0.75em;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+            flex: 1;
+            min-width: 250px;
+            box-sizing: border-box;
         }
 
         h1, h2, h3 {
@@ -28,9 +45,7 @@
 
         form {
             background: white;
-            padding: 1.5em;
-            border-radius: 0.75em;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+            padding: 1em 0;
         }
 
         label {
@@ -102,19 +117,24 @@
             padding: 0.3em 0;
         }
 
-        #remaining-words {
-            max-height: 200px;
+        #remaining-words,
+        #guess-history {
+            max-height: 400px;
             overflow-y: auto;
-            background: #fff;
-            padding: 1em;
-            border-radius: 0.5em;
-            border: 1px solid #eee;
         }
 
-        @media (max-width: 500px) {
-            #feedback-buttons button {
-                font-size: 1.2em;
-                padding: 0.4em 0;
+        .uitleg {
+            margin-top: 1em;
+            font-size: 0.95em;
+            background: #fff4e5;
+            padding: 1em;
+            border-radius: 0.5em;
+            border: 1px solid #ffe1b3;
+        }
+
+        @media (max-width: 800px) {
+            .layout {
+                flex-direction: column;
             }
 
             button[type="submit"],
@@ -124,44 +144,58 @@
             }
 
             form {
-                padding: 1em;
+                padding: 0.5em 0;
             }
         }
     </style>
 </head>
 <body>
-    <h1>Woordle Assistent 🇳🇱</h1>
-    <form id="wordle-form">
-        <label for="guess">Jouw gok:</label>
-        <input type="text" id="guess" name="guess" maxlength="5">
+    <div class="layout">
+        <!-- Linkerkolom: Overgebleven woorden -->
+        <div class="column" id="left-column">
+            <h2>Suggestie:</h2>
+            <p id="suggestion">...</p>
 
-        <label for="feedback">Feedback:</label>
-        <div id="feedback-buttons"></div>
-        <input type="text" id="feedback" name="feedback" maxlength="5" style="display: none;">
-
-        <div style="display: flex; justify-content: space-between; gap: 1%;">
-            <button type="submit">Volgende Suggestie</button>
-            <button type="button" onclick="resetGame()">Reset</button>
+            <h3>Overgebleven woorden (<span id="remaining-count">?</span>):</h3>
+            <ul id="remaining-words"></ul>
         </div>
-    </form>
-    <div style="margin-top: 1em; font-size: 0.95em; background: #fff4e5; padding: 1em; border-radius: 0.5em; border: 1px solid #ffe1b3;">
-        <strong>Hoe geef je feedback?</strong><br>
-        Klik op de vakjes om de juiste kleur aan te geven voor elke letter van je vorige gok:
-        <ul style="margin-top: 0.5em; padding-left: 1.2em;">
-            <li>⬛ = Letter komt <strong>niet</strong> voor in het woord (grijs)</li>
-            <li>🟨 = Letter komt <strong>wel</strong> voor, maar op de verkeerde plek (geel)</li>
-            <li>🟩 = Letter zit op de <strong>juiste</strong> plek (groen)</li>
-        </ul>
-        Tip: Klik meerdere keren om door de kleuren te schakelen.
+
+        <!-- Middenkolom: Formulier, uitleg en suggestie -->
+        <div class="column" id="center-column">
+            <h1>Woordle Assistent 🇳🇱</h1>
+            <form id="wordle-form">
+                <label for="guess">Jouw gok:</label>
+                <input type="text" id="guess" name="guess" maxlength="5">
+
+                <label for="feedback">Feedback:</label>
+                <div id="feedback-buttons"></div>
+                <input type="text" id="feedback" name="feedback" maxlength="5" style="display: none;">
+
+                <div style="display: flex; justify-content: space-between; gap: 1%;">
+                    <button type="submit">Volgende Suggestie</button>
+                    <button type="button" onclick="resetGame()">Reset</button>
+                </div>
+            </form>
+
+            <div class="uitleg">
+                <strong>Hoe geef je feedback?</strong><br>
+                Klik op de vakjes om de juiste kleur aan te geven voor elke letter van je vorige gok:
+                <ul>
+                    <li>⬛ = Letter komt <strong>niet</strong> voor in het woord (grijs)</li>
+                    <li>🟨 = Letter komt <strong>wel</strong> voor, maar op de verkeerde plek (geel)</li>
+                    <li>🟩 = Letter zit op de <strong>juiste</strong> plek (groen)</li>
+                </ul>
+                Tip: Klik meerdere keren om door de kleuren te schakelen.
+            </div>
+
+        </div>
+
+        <!-- Rechterkolom: Geschiedenis -->
+        <div class="column" id="right-column">
+            <h3>Geschiedenis:</h3>
+            <ul id="guess-history"></ul>
+        </div>
     </div>
-    <h2>Suggestie:</h2>
-    <p id="suggestion">...</p>
-
-    <h3>Overgebleven woorden (<span id="remaining-count">?</span>):</h3>
-    <ul id="remaining-words"></ul>
-
-    <h3>Geschiedenis:</h3>
-    <ul id="guess-history"></ul>
 
     <script>
         const form = document.getElementById("wordle-form");
