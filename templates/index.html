@@ -147,20 +147,61 @@
                 padding: 0.5em 0;
             }
         }
+
+        /* 🎯 Loading spinner styles */
+        #loading-spinner {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            margin-top: 1em;
+        }
+
+        .spinner-dot {
+            width: 12px;
+            height: 12px;
+            background-color: #6aaa64;
+            border-radius: 50%;
+            margin: 0 5px;
+            animation: bounce 1.2s infinite ease-in-out;
+        }
+
+        .spinner-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .spinner-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="layout">
-        <!-- Linkerkolom: Overgebleven woorden -->
+        <!-- Linkerkolom -->
         <div class="column" id="left-column">
             <h2>Suggestie:</h2>
+            <div id="loading-spinner">
+                <div class="spinner-dot"></div>
+                <div class="spinner-dot"></div>
+                <div class="spinner-dot"></div>
+            </div>
             <p id="suggestion">...</p>
 
             <h3>Overgebleven woorden (<span id="remaining-count">?</span>):</h3>
             <ul id="remaining-words"></ul>
         </div>
 
-        <!-- Middenkolom: Formulier, uitleg en suggestie -->
+        <!-- Middenkolom -->
         <div class="column" id="center-column">
             <h1>Woordle Assistent 🇳🇱</h1>
             <form id="wordle-form">
@@ -187,10 +228,9 @@
                 </ul>
                 Tip: Klik meerdere keren om door de kleuren te schakelen.
             </div>
-
         </div>
 
-        <!-- Rechterkolom: Geschiedenis -->
+        <!-- Rechterkolom -->
         <div class="column" id="right-column">
             <h3>Geschiedenis:</h3>
             <ul id="guess-history"></ul>
@@ -206,6 +246,7 @@
         const remainingList = document.getElementById("remaining-words");
         const historyList = document.getElementById("guess-history");
         const feedbackButtonsContainer = document.getElementById("feedback-buttons");
+        const loadingSpinner = document.getElementById("loading-spinner");
 
         function createFeedbackButtons(guess) {
             feedbackButtonsContainer.innerHTML = "";
@@ -257,31 +298,42 @@
         form.onsubmit = async function (e) {
             e.preventDefault();
 
-            const formData = new FormData(form);
-            const response = await fetch("/next", { method: "POST", body: formData });
-            const data = await response.json();
+            loadingSpinner.style.display = "flex";
+            guessInput.disabled = true;
 
-            if (data.guess) {
-                suggestionEl.textContent = data.second_best
-                    ? `${data.guess} (of ${data.second_best})`
-                    : data.guess;
-                guessInput.value = data.guess;
-                createFeedbackButtons(data.guess);
-            } else {
-                suggestionEl.textContent = "Geen suggesties meer gevonden.";
-                guessInput.value = "";
-                feedbackButtonsContainer.innerHTML = "";
+            try {
+                const formData = new FormData(form);
+                const response = await fetch("/next", { method: "POST", body: formData });
+                const data = await response.json();
+
+                if (data.guess) {
+                    suggestionEl.textContent = data.second_best
+                        ? `${data.guess} (of ${data.second_best})`
+                        : data.guess;
+                    guessInput.value = data.guess;
+                    createFeedbackButtons(data.guess);
+                } else {
+                    suggestionEl.textContent = "Geen suggesties meer gevonden.";
+                    guessInput.value = "";
+                    feedbackButtonsContainer.innerHTML = "";
+                }
+
+                remainingCountEl.textContent = data.count;
+                remainingList.innerHTML = "";
+                data.remaining.forEach(word => {
+                    const li = document.createElement("li");
+                    li.textContent = word;
+                    remainingList.appendChild(li);
+                });
+
+                updateHistory(data.history);
+            } catch (err) {
+                suggestionEl.textContent = "Er ging iets mis.";
+                console.error(err);
+            } finally {
+                loadingSpinner.style.display = "none";
+                guessInput.disabled = false;
             }
-
-            remainingCountEl.textContent = data.count;
-            remainingList.innerHTML = "";
-            data.remaining.forEach(word => {
-                const li = document.createElement("li");
-                li.textContent = word;
-                remainingList.appendChild(li);
-            });
-
-            updateHistory(data.history);
         };
 
         async function resetGame() {
@@ -297,6 +349,9 @@
         }
 
         async function loadInitialSuggestion() {
+            loadingSpinner.style.display = "flex";
+            guessInput.disabled = true;
+
             const response = await fetch("/next", { method: "POST" });
             const data = await response.json();
 
@@ -319,6 +374,8 @@
             });
 
             updateHistory(data.history);
+            loadingSpinner.style.display = "none";
+            guessInput.disabled = false;
         }
 
         window.onload = loadInitialSuggestion;
