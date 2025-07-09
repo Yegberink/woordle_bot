@@ -79,7 +79,7 @@ def calculate_entropy(remaining, all_guesses):
         entropy = 0.0
         for count_list in pattern_map.values():
             # count how many targets remain for this pattern
-            cnt = sum(1 for idx in count_list if idx in remaining_indices)
+            cnt = len(remaining_indices & set(count_list))
             if cnt == 0:
                 continue
             p = cnt / total
